@@ -28,7 +28,9 @@ public class SecurityConfig {
 	        .authorizeHttpRequests(auth -> auth
 	            .requestMatchers("/", "/login**", "/error", "/webjars/**", "/api/token").permitAll()
 	            .requestMatchers("/oauth2/**").permitAll()
+	            
 	            .requestMatchers("/actuator/**").permitAll()
+	            .requestMatchers("/api/health").permitAll()
 	            .anyRequest().authenticated()
 	        )
 	        .exceptionHandling(exception -> exception
