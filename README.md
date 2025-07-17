@@ -17,6 +17,8 @@ This is the backend service for the Arceon GitHub Dashboard application.
 4. Use the following settings:
    - **Name**: arceon-backend (or your preferred name)
    - **Environment**: Docker
+   - **Region**: Choose the region closest to your users
+   - **Branch**: main (or your default branch)
    - **Plan**: Free (or choose a paid plan for better performance)
 
 5. Add the following environment variables:
@@ -27,6 +29,15 @@ This is the backend service for the Arceon GitHub Dashboard application.
    - `BASE_URL`: Your Render app URL (e.g., https://arceon-backend.onrender.com)
 
 6. Click "Create Web Service"
+
+### Troubleshooting Render Deployment
+
+If you encounter issues with the deployment:
+
+1. Check the build logs in the Render dashboard
+2. Ensure the Dockerfile is correctly set up
+3. Verify that all environment variables are correctly set
+4. Make sure your GitHub OAuth app is correctly configured
 
 ### GitHub OAuth Configuration
 
@@ -60,6 +71,13 @@ Make sure your frontend application is configured to connect to your Render back
 2. Build the Docker image: `docker build -t arceon-backend .`
 3. Run the container: `docker run -p 8080:8080 arceon-backend`
 4. The application will be available at http://localhost:8080
+
+### Running with Docker Compose
+
+1. Clone the repository
+2. Run `docker-compose up`
+3. The application will be available at http://localhost:8080
+4. To stop the application, run `docker-compose down`
 
 ## Environment Variables
 

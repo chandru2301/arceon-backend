@@ -1,5 +1,25 @@
-target/
+# Git
 .git/
 .gitignore
+.gitattributes
+
+# Build artifacts
+target/
+
+# Logs
+*.log
+
+# IDE files
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+
+# Documentation
 README.md
-*.log 
+HELP.md
+
+# Docker files
+docker-compose.yml
+render.yaml 

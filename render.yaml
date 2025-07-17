@@ -3,11 +3,16 @@ services:
     name: arceon-backend
     env: docker
     plan: free
-    dockerfilePath: ./Dockerfile
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
       - key: PORT
         value: 8080
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: BASE_URL
+        sync: false
     healthCheckPath: /
     autoDeploy: true 

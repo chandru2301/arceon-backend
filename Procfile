@@ -1,1 +1,1 @@
-web: java -jar target/GithubManager-0.0.1-SNAPSHOT.jar 
+web: java -jar app.jar 
