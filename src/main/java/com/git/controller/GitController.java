@@ -17,6 +17,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,22 +40,38 @@ public class GitController {
 
     @Autowired
     private OAuth2AuthorizedClientService authorizedClientService;
+    @GetMapping("/api/token")
+    public ResponseEntity<?> exchangeCodeForToken(@RequestParam String code) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
 
-    @GetMapping("/token")
-    public ResponseEntity<?> getToken(OAuth2AuthenticationToken authentication) {
-        if (authentication == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not authenticated");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            MultiValueMap<String, String> params = new LinkedMultiValueMap();
+            params.add("client_id", "Ov23liIlROaBzS33BvdP");
+            params.add("client_secret", "c99ea03480d72296a406273e2f4653c6d6db72d7");
+            params.add("code", code);
+            params.add("redirect_uri", "https://arceon.netlify.app/oauth/callback");
+
+            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, headers);
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    "https://github.com/login/oauth/access_token", request, Map.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                Map<String, Object> body = response.getBody();
+                String accessToken = (String) body.get("access_token");
+                return ResponseEntity.ok(Map.of("token", accessToken));
+            }
+
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token exchange failed");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("OAuth exchange error");
         }
-
-        OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
-                authentication.getAuthorizedClientRegistrationId(),
-                authentication.getName());
-
-        if (client == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
-        }
-
-        return ResponseEntity.ok(Collections.singletonMap("token", client.getAccessToken().getTokenValue()));
     }
 
     // Get current authenticated user
