@@ -2,7 +2,7 @@
 
 This is the backend service for the Arceon GitHub Dashboard application.
 
-## Deployment on Render
+## Deployment on Render with Docker
 
 ### Prerequisites
 
@@ -16,9 +16,7 @@ This is the backend service for the Arceon GitHub Dashboard application.
 3. Connect your GitHub repository
 4. Use the following settings:
    - **Name**: arceon-backend (or your preferred name)
-   - **Environment**: Java
-   - **Build Command**: `./mvnw package -DskipTests`
-   - **Start Command**: `java -jar target/GithubManager-0.0.1-SNAPSHOT.jar`
+   - **Environment**: Docker
    - **Plan**: Free (or choose a paid plan for better performance)
 
 5. Add the following environment variables:
@@ -50,9 +48,18 @@ Make sure your frontend application is configured to connect to your Render back
 
 ## Local Development
 
+### Running with Maven
+
 1. Clone the repository
 2. Run `./mvnw spring-boot:run`
 3. The application will be available at http://localhost:8081
+
+### Running with Docker
+
+1. Clone the repository
+2. Build the Docker image: `docker build -t arceon-backend .`
+3. Run the container: `docker run -p 8080:8080 arceon-backend`
+4. The application will be available at http://localhost:8080
 
 ## Environment Variables
 

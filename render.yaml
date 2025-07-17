@@ -1,10 +1,9 @@
 services:
   - type: web
     name: arceon-backend
-    env: java
+    env: docker
     plan: free
-    buildCommand: ./mvnw package -DskipTests
-    startCommand: java -jar target/GithubManager-0.0.1-SNAPSHOT.jar
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
