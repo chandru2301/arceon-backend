@@ -29,7 +29,7 @@ public class SecurityConfig {
 	        )
 	        .oauth2Login(oauth2 -> oauth2
 	            .loginPage("/login")
-	            .defaultSuccessUrl("https://arceon.netlify.app/dashboard?code=success", true)
+	            .defaultSuccessUrl("https://arceon.netlify.app/oauth/callback?code=success", true)
 	            .failureUrl("https://arceon.netlify.app/login?error=true")
 	        )
 	        .logout(logout -> logout
