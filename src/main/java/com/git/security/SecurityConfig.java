@@ -14,6 +14,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -25,9 +27,15 @@ public class SecurityConfig {
 	        .csrf(csrf -> csrf.disable())
 	        .authorizeHttpRequests(auth -> auth
 	            .requestMatchers("/", "/login**", "/error", "/webjars/**", "/api/token").permitAll()
-				 .requestMatchers("/oauth2/**").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
+	            .requestMatchers("/oauth2/**").permitAll()
+	            .requestMatchers("/actuator/**").permitAll()
 	            .anyRequest().authenticated()
+	        )
+	        .exceptionHandling(exception -> exception
+	            .authenticationEntryPoint((request, response, authException) -> {
+	                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+	                response.getWriter().write("Unauthorized");
+	            })
 	        )
 	        .oauth2Login(oauth2 -> oauth2
 	            .loginPage("/login")
