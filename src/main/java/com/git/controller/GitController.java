@@ -514,5 +514,10 @@ public ResponseEntity<?> getPinnedRepos(OAuth2AuthenticationToken authentication
         return ResponseEntity.status(500).body("Error fetching pinned repos: " + e.getMessage());
     }
 }
+@GetMapping("/health")
+public ResponseEntity<String> healthCheck() {
+    return ResponseEntity.ok("Healthy");
+}
+
 
 }
