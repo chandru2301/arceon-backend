@@ -1,6 +1,7 @@
 package com.git.controller;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +28,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
+import com.git.security.JwtTokenUtil;
+
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = {"http://localhost:3000", "https://arceon.netlify.app"})
@@ -34,6 +37,9 @@ public class GitController {
 
     @Autowired
     private RestTemplate restTemplate;
+    
+    @Autowired
+    private JwtTokenUtil jwtTokenUtil;
 
     @Value("${github.api.base-url:https://api.github.com}")
     private String githubApiBaseUrl;
@@ -63,7 +69,32 @@ public class GitController {
             if (response.getStatusCode().is2xxSuccessful()) {
                 Map<String, Object> body = response.getBody();
                 String accessToken = (String) body.get("access_token");
-                return ResponseEntity.ok(Map.of("token", accessToken));
+                
+                // Get user info from GitHub
+                HttpHeaders userHeaders = new HttpHeaders();
+                userHeaders.setBearerAuth(accessToken);
+                HttpEntity<String> userRequest = new HttpEntity<>(userHeaders);
+                
+                ResponseEntity<Map> userResponse = restTemplate.exchange(
+                        "https://api.github.com/user",
+                        HttpMethod.GET,
+                        userRequest,
+                        Map.class);
+                
+                if (userResponse.getStatusCode().is2xxSuccessful()) {
+                    Map<String, Object> userInfo = userResponse.getBody();
+                    String username = (String) userInfo.get("login");
+                    
+                    // Create JWT token with user info
+                    Map<String, Object> claims = new HashMap<>();
+                    claims.put("name", userInfo.get("name"));
+                    claims.put("avatar_url", userInfo.get("avatar_url"));
+                    claims.put("github_token", accessToken);
+                    
+                    String jwtToken = jwtTokenUtil.generateToken(username, claims);
+                    
+                    return ResponseEntity.ok(Map.of("token", jwtToken));
+                }
             }
 
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token exchange failed");

@@ -2,13 +2,16 @@ package com.git.security;
 
 import java.util.Arrays;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -20,36 +23,42 @@ import jakarta.servlet.http.HttpServletResponse;
 @EnableWebSecurity
 public class SecurityConfig {
 
-	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-	    http
-	        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-	        .csrf(csrf -> csrf.disable())
-	        .authorizeHttpRequests(auth -> auth
-	            .requestMatchers("/", "/login**", "/error", "/webjars/**", "/api/token").permitAll()
-	            .requestMatchers("/oauth2/**").permitAll()
-	            
-	            .requestMatchers("/actuator/**").permitAll()
-	            .requestMatchers("/api/health").permitAll()
-	            .anyRequest().authenticated()
-	        )
-	        .exceptionHandling(exception -> exception
-	            .authenticationEntryPoint((request, response, authException) -> {
-	                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-	                response.getWriter().write("Unauthorized");
-	            })
-	        )
-	        .oauth2Login(oauth2 -> oauth2
-	            .loginPage("/login")
-	            .defaultSuccessUrl("https://arceon.netlify.app/dashboard", true)
-	            .failureUrl("https://arceon.netlify.app/login?error=true")
-	        )
-	        .logout(logout -> logout
-	            .logoutSuccessUrl("https://arceon.netlify.app/login").permitAll()
-	        );
+    @Autowired
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
-	    return http.build();
-	}
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/", "/login**", "/error", "/webjars/**", "/api/token", "/api/auth/**").permitAll()
+                .requestMatchers("/oauth2/**").permitAll()
+                .requestMatchers("/actuator/**").permitAll()
+                .requestMatchers("/api/health").permitAll()
+                .anyRequest().authenticated()
+            )
+            .exceptionHandling(exception -> exception
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.getWriter().write("Unauthorized");
+                })
+            )
+            .oauth2Login(oauth2 -> oauth2
+                .loginPage("/login")
+                .defaultSuccessUrl("https://arceon.netlify.app/dashboard", true)
+                .failureUrl("https://arceon.netlify.app/login?error=true")
+            )
+            .logout(logout -> logout
+                .logoutSuccessUrl("https://arceon.netlify.app/login").permitAll()
+            )
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -64,7 +73,6 @@ public class SecurityConfig {
         
         return source;
     }
-
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
