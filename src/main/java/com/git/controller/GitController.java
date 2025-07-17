@@ -40,7 +40,7 @@ public class GitController {
 
     @Autowired
     private OAuth2AuthorizedClientService authorizedClientService;
-    @GetMapping("/api/token")
+    @GetMapping("/token")
     public ResponseEntity<?> exchangeCodeForToken(@RequestParam String code) {
         try {
             RestTemplate restTemplate = new RestTemplate();
