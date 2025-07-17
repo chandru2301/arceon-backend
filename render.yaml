@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: arceon-backend
+    env: java
+    plan: free
+    buildCommand: ./mvnw package -DskipTests
+    startCommand: java -jar target/GithubManager-0.0.1-SNAPSHOT.jar
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: PORT
+        value: 8080
+    healthCheckPath: /
+    autoDeploy: true 
