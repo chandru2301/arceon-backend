@@ -32,10 +32,12 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/login**", "/error", "/webjars/**", "/api/token", "/api/auth/**").permitAll()
+                .requestMatchers("/", "/login**", "/error", "/webjars/**", "/api/token").permitAll()
                 .requestMatchers("/oauth2/**").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/api/health").permitAll()
+                .requestMatchers("/api/auth/validate", "/api/auth/test").permitAll()
+                .requestMatchers("/api/auth/jwt", "/api/auth/user").authenticated()
                 .anyRequest().authenticated()
             )
             .exceptionHandling(exception -> exception
@@ -46,6 +48,7 @@ public class SecurityConfig {
             )
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
+//                .defaultSuccessUrl("https://arceon.netlify.app/dashboard", true)
                 .defaultSuccessUrl("https://arceon.netlify.app/dashboard", true)
             )
             .logout(logout -> logout

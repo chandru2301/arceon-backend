@@ -48,6 +48,11 @@ public class JwtTokenUtil {
         return extractClaim(token, Claims::getSubject);
     }
 
+    public String extractGitHubToken(String token) {
+        Claims claims = extractAllClaims(token);
+        return claims.get("github_token", String.class);
+    }
+
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
