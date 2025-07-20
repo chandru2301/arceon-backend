@@ -47,7 +47,8 @@ public class GitController {
     private String githubClientId;
     @Value("${github.client.secret:c99ea03480d72296a406273e2f4653c6d6db72d7}")
     private String githubClientSecret;
-    @Value("${github.redirect.uri:https://arceon.netlify.app/oauth/callback}")
+    // @Value("${github.redirect.uri:https://arceon.netlify.app/oauth/callback}")
+    @Value("${github.redirect.uri:http://localhost:3000/oauth/callback}")
     private String githubRedirectUri;   
 
     private static final Logger logger = LoggerFactory.getLogger(GitController.class);
@@ -642,9 +643,453 @@ public ResponseEntity<?> getPinnedRepos(HttpServletRequest request) {
 }
 @GetMapping("/health")
 public ResponseEntity<String> healthCheck() {
-    logger.info("Health Check Response: Healthy");
-        return ResponseEntity.ok("Healthy");
+    return ResponseEntity.ok("GitHub Manager API is running");
 }
 
+    // Get recent followers with activity
+    @GetMapping("/github/recent-followers")
+    public ResponseEntity<?> getRecentFollowers(HttpServletRequest request) {
+        String accessToken = getGitHubTokenFromJWT(request);
+        if (accessToken == null) {
+            return ResponseEntity.status(401).body("GitHub access token not found");
+        }
 
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.set("Accept", "application/vnd.github+json");
+            headers.set("User-Agent", "GitHub-Flow-App");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            String jwtToken = request.getHeader("Authorization").substring(7);
+            String username = jwtTokenUtil.extractUsername(jwtToken);
+            
+            // Get followers
+            ResponseEntity<List> followersResponse = restTemplate.exchange(
+                githubApiBaseUrl + "/users/" + username + "/followers?per_page=10",
+                HttpMethod.GET,
+                entity,
+                List.class
+            );
+            
+            List<Map<String, Object>> followers = followersResponse.getBody();
+            List<Map<String, Object>> recentFollowers = new ArrayList<>();
+            
+            if (followers != null) {
+                for (int i = 0; i < followers.size(); i++) {
+                    Map<String, Object> follower = followers.get(i);
+                    Map<String, Object> followerData = new HashMap<>();
+                    followerData.put("username", follower.get("login"));
+                    followerData.put("name", follower.get("name") != null ? follower.get("name") : follower.get("login"));
+                    followerData.put("avatar", follower.get("avatar_url"));
+                    followerData.put("action", "started following you");
+                    
+                    // Simulate different times based on position
+                    String[] timeOptions = {"2 hours ago", "5 hours ago", "1 day ago", "2 days ago", "1 week ago"};
+                    String time = i < timeOptions.length ? timeOptions[i] : "recently";
+                    followerData.put("time", time);
+                    
+                    recentFollowers.add(followerData);
+                }
+            }
+            
+            return ResponseEntity.ok(recentFollowers);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching recent followers: " + e.getMessage());
+        }
+    }
+
+    // Get starred repository activity
+    @GetMapping("/github/starred-activity")
+    public ResponseEntity<?> getStarredRepositoryActivity(HttpServletRequest request) {
+        String accessToken = getGitHubTokenFromJWT(request);
+        if (accessToken == null) {
+            return ResponseEntity.status(401).body("GitHub access token not found");
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.set("Accept", "application/vnd.github+json");
+            headers.set("User-Agent", "GitHub-Flow-App");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            // Get starred repositories
+            ResponseEntity<List> starredResponse = restTemplate.exchange(
+                githubApiBaseUrl + "/user/starred?per_page=10",
+                HttpMethod.GET,
+                entity,
+                List.class
+            );
+            
+            List<Map<String, Object>> starredRepos = starredResponse.getBody();
+            List<Map<String, Object>> activity = new ArrayList<>();
+            
+            String[] activityTypes = {
+                "New release available",
+                "Recent commits added",
+                "New issues opened",
+                "Pull requests merged",
+                "Documentation updated"
+            };
+            
+            String[] timeOptions = {"1 hour ago", "3 hours ago", "1 day ago", "2 days ago", "1 week ago"};
+            
+            if (starredRepos != null) {
+                for (int i = 0; i < starredRepos.size(); i++) {
+                    Map<String, Object> repo = starredRepos.get(i);
+                    String repoName = (String) repo.get("full_name");
+                    if (repoName == null) {
+                        repoName = (String) repo.get("name");
+                    }
+                    
+                    Map<String, Object> activityData = new HashMap<>();
+                    activityData.put("repo", repoName);
+                    
+                    // Use different activity types based on position
+                    String activityType = i < activityTypes.length ? activityTypes[i] : "Repository updated";
+                    activityData.put("activity", activityType);
+                    
+                    // Use different times based on position
+                    String time = i < timeOptions.length ? timeOptions[i] : "recently";
+                    activityData.put("time", time);
+                    activityData.put("type", "star");
+                    activity.add(activityData);
+                }
+            }
+            
+            return ResponseEntity.ok(activity);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching starred activity: " + e.getMessage());
+        }
+    }
+
+    // Get community stats
+    @GetMapping("/github/community-stats")
+    public ResponseEntity<?> getCommunityStats(HttpServletRequest request) {
+        String accessToken = getGitHubTokenFromJWT(request);
+        if (accessToken == null) {
+            return ResponseEntity.status(401).body("GitHub access token not found");
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.set("Accept", "application/vnd.github+json");
+            headers.set("User-Agent", "GitHub-Flow-App");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            String jwtToken = request.getHeader("Authorization").substring(7);
+            String username = jwtTokenUtil.extractUsername(jwtToken);
+            
+            // Get user profile for stats
+            ResponseEntity<Map> profileResponse = restTemplate.exchange(
+                githubApiBaseUrl + "/users/" + username,
+                HttpMethod.GET,
+                entity,
+                Map.class
+            );
+            
+            Map<String, Object> profile = profileResponse.getBody();
+            Map<String, Object> stats = new HashMap<>();
+            
+            if (profile != null) {
+                stats.put("followers", profile.get("followers"));
+                stats.put("following", profile.get("following"));
+                stats.put("public_repos", profile.get("public_repos"));
+                stats.put("public_gists", profile.get("public_gists"));
+            }
+            
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching community stats: " + e.getMessage());
+        }
+    }
+
+    // Get user achievements and milestones
+    @GetMapping("/github/achievements")
+    public ResponseEntity<?> getUserAchievements(HttpServletRequest request) {
+        String accessToken = getGitHubTokenFromJWT(request);
+        if (accessToken == null) {
+            return ResponseEntity.status(401).body("GitHub access token not found");
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.set("Accept", "application/vnd.github+json");
+            headers.set("User-Agent", "GitHub-Flow-App");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            String jwtToken = request.getHeader("Authorization").substring(7);
+            String username = jwtTokenUtil.extractUsername(jwtToken);
+            
+            // Get user profile
+            ResponseEntity<Map> profileResponse = restTemplate.exchange(
+                githubApiBaseUrl + "/users/" + username,
+                HttpMethod.GET,
+                entity,
+                Map.class
+            );
+            
+            Map<String, Object> profile = profileResponse.getBody();
+            
+            // Get user repositories for additional stats
+            ResponseEntity<List> reposResponse = restTemplate.exchange(
+                githubApiBaseUrl + "/users/" + username + "/repos?per_page=100",
+                HttpMethod.GET,
+                entity,
+                List.class
+            );
+            
+            List<Map<String, Object>> repos = reposResponse.getBody();
+            
+            // Calculate achievements based on real data
+            List<Map<String, Object>> achievements = new ArrayList<>();
+            
+            if (profile != null) {
+                Integer publicRepos = (Integer) profile.get("public_repos");
+                Integer followers = (Integer) profile.get("followers");
+                Integer following = (Integer) profile.get("following");
+                
+                // First Repository achievement
+                Map<String, Object> firstRepo = new HashMap<>();
+                firstRepo.put("id", 1);
+                firstRepo.put("title", "First Repository");
+                firstRepo.put("description", "Created your first GitHub repository");
+                firstRepo.put("icon", "GitBranch");
+                firstRepo.put("earned", publicRepos != null && publicRepos > 0);
+                firstRepo.put("date", "Recently");
+                achievements.add(firstRepo);
+                
+                // 100 Stars achievement
+                Map<String, Object> hundredStars = new HashMap<>();
+                hundredStars.put("id", 2);
+                hundredStars.put("title", "100 Stars");
+                hundredStars.put("description", "Received 100 stars across all repositories");
+                hundredStars.put("icon", "Star");
+                
+                // Calculate total stars from repositories
+                int totalStars = 0;
+                if (repos != null) {
+                    for (Map<String, Object> repo : repos) {
+                        Integer stars = (Integer) repo.get("stargazers_count");
+                        if (stars != null) totalStars += stars;
+                    }
+                }
+                
+                hundredStars.put("earned", totalStars >= 100);
+                hundredStars.put("progress", Math.min(100, (totalStars * 100) / 100));
+                achievements.add(hundredStars);
+                
+                // Community Builder achievement
+                Map<String, Object> communityBuilder = new HashMap<>();
+                communityBuilder.put("id", 3);
+                communityBuilder.put("title", "Community Builder");
+                communityBuilder.put("description", "Gained 50 followers");
+                communityBuilder.put("icon", "Users");
+                communityBuilder.put("earned", followers != null && followers >= 50);
+                communityBuilder.put("progress", followers != null ? Math.min(100, (followers * 100) / 50) : 0);
+                achievements.add(communityBuilder);
+                
+                // Repository Master achievement
+                Map<String, Object> repoMaster = new HashMap<>();
+                repoMaster.put("id", 4);
+                repoMaster.put("title", "Repository Master");
+                repoMaster.put("description", "Created 10 public repositories");
+                repoMaster.put("icon", "GitBranch");
+                repoMaster.put("earned", publicRepos != null && publicRepos >= 10);
+                repoMaster.put("progress", publicRepos != null ? Math.min(100, (publicRepos * 100) / 10) : 0);
+                achievements.add(repoMaster);
+                
+                // Star Collector achievement
+                Map<String, Object> starCollector = new HashMap<>();
+                starCollector.put("id", 5);
+                starCollector.put("title", "Star Collector");
+                starCollector.put("description", "Received 500 stars across all repositories");
+                starCollector.put("icon", "Star");
+                starCollector.put("earned", totalStars >= 500);
+                starCollector.put("progress", Math.min(100, (totalStars * 100) / 500));
+                achievements.add(starCollector);
+                
+                // Social Butterfly achievement
+                Map<String, Object> socialButterfly = new HashMap<>();
+                socialButterfly.put("id", 6);
+                socialButterfly.put("title", "Social Butterfly");
+                socialButterfly.put("description", "Gained 100 followers");
+                socialButterfly.put("icon", "Users");
+                socialButterfly.put("earned", followers != null && followers >= 100);
+                socialButterfly.put("progress", followers != null ? Math.min(100, (followers * 100) / 100) : 0);
+                achievements.add(socialButterfly);
+                
+                // Contributor achievement (simulated)
+                Map<String, Object> contributor = new HashMap<>();
+                contributor.put("id", 7);
+                contributor.put("title", "Contributor");
+                contributor.put("description", "Made 365 contributions in a year");
+                contributor.put("icon", "Zap");
+                contributor.put("earned", false);
+                contributor.put("progress", 78); // Simulated progress
+                achievements.add(contributor);
+            }
+            
+            return ResponseEntity.ok(achievements);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching achievements: " + e.getMessage());
+        }
+    }
+
+    // Get user milestones
+    @GetMapping("/github/milestones")
+    public ResponseEntity<?> getUserMilestones(HttpServletRequest request) {
+        String accessToken = getGitHubTokenFromJWT(request);
+        if (accessToken == null) {
+            return ResponseEntity.status(401).body("GitHub access token not found");
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.set("Accept", "application/vnd.github+json");
+            headers.set("User-Agent", "GitHub-Flow-App");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            String jwtToken = request.getHeader("Authorization").substring(7);
+            String username = jwtTokenUtil.extractUsername(jwtToken);
+            
+            // Get user profile
+            ResponseEntity<Map> profileResponse = restTemplate.exchange(
+                githubApiBaseUrl + "/users/" + username,
+                HttpMethod.GET,
+                entity,
+                Map.class
+            );
+            
+            Map<String, Object> profile = profileResponse.getBody();
+            
+            // Get user repositories
+            ResponseEntity<List> reposResponse = restTemplate.exchange(
+                githubApiBaseUrl + "/users/" + username + "/repos?per_page=100",
+                HttpMethod.GET,
+                entity,
+                List.class
+            );
+            
+            List<Map<String, Object>> repos = reposResponse.getBody();
+            
+            // Calculate milestones based on real data
+            List<Map<String, Object>> milestones = new ArrayList<>();
+            
+            if (profile != null && repos != null) {
+                Integer publicRepos = (Integer) profile.get("public_repos");
+                Integer followers = (Integer) profile.get("followers");
+                
+                // Calculate total stars
+                int totalStars = 0;
+                for (Map<String, Object> repo : repos) {
+                    Integer stars = (Integer) repo.get("stargazers_count");
+                    if (stars != null) totalStars += stars;
+                }
+                
+                // Calculate total contributions
+//                int totalContributions = 0;
+//                for (Map<String, Object> repo : repos) {
+//                    Integer contributions = (Integer) repo.get("contributions");
+//                    if (contributions != null) totalContributions += contributions;
+//                }
+             // GraphQL Query to get total contributions
+                Map<String, Object> queryMap = new HashMap<>();
+                queryMap.put("query", String.format("""
+                    query {
+                        user(login: "%s") {
+                            contributionsCollection {
+                                contributionCalendar {
+                                    totalContributions
+                                    weeks {
+                                        contributionDays {
+                                            contributionCount
+                                            date
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                """, username));
+
+                HttpEntity<Map<String, Object>> graphqlRequest = new HttpEntity<>(queryMap, headers);
+
+                ResponseEntity<Map> contributionsResponse = restTemplate.exchange(
+                    githubApiBaseUrl + "/graphql",
+                    HttpMethod.POST,
+                    graphqlRequest,
+                    Map.class
+                );
+
+                Map<String, Object> contributions = contributionsResponse.getBody();
+                Map<String, Object> data = (Map<String, Object>) contributions.get("data");
+                Map<String, Object> user = (Map<String, Object>) data.get("user");
+                Map<String, Object> collection = (Map<String, Object>) user.get("contributionsCollection");
+                Map<String, Object> calendar = (Map<String, Object>) collection.get("contributionCalendar");
+
+                // ✅ Get total contributions from GraphQL
+                Integer totalContributions = (Integer) calendar.get("totalContributions");
+                System.out.println("totalContributions: " + totalContributions);
+
+                // 📌 Add milestone for contributions
+                Map<String, Object> contributionsMilestone = new HashMap<>();
+                contributionsMilestone.put("label", "Total Contributions");
+                contributionsMilestone.put("current", totalContributions != null ? totalContributions : 0);
+                contributionsMilestone.put("target", 1500);
+                contributionsMilestone.put("unit", "contributions");
+
+                // Optional: Add progress
+                if (totalContributions != null) {
+                    double progress = Math.min(100.0, (totalContributions * 100.0) / 1500.0);
+                    contributionsMilestone.put("progress", progress);
+                }
+
+                milestones.add(contributionsMilestone);
+
+                // 📌 Repositories milestone
+                Map<String, Object> reposMilestone = new HashMap<>();
+                reposMilestone.put("label", "Repositories");
+                reposMilestone.put("current", publicRepos != null ? publicRepos : 0);
+                reposMilestone.put("target", 100);
+                reposMilestone.put("unit", "repos");
+
+                if (publicRepos != null) {
+                    double repoProgress = Math.min(100.0, (publicRepos * 100.0) / 100.0);
+                    reposMilestone.put("progress", repoProgress);
+                }
+
+                milestones.add(reposMilestone);
+    
+                // Stars milestone
+                Map<String, Object> starsMilestone = new HashMap<>();
+                starsMilestone.put("label", "Stars Received");
+                starsMilestone.put("current", totalStars);
+                starsMilestone.put("target", 500);
+                starsMilestone.put("unit", "stars");
+                milestones.add(starsMilestone);
+                
+                // Followers milestone
+                Map<String, Object> followersMilestone = new HashMap<>();
+                followersMilestone.put("label", "Followers");
+                followersMilestone.put("current", followers != null ? followers : 0);
+                followersMilestone.put("target", 200);
+                followersMilestone.put("unit", "followers");
+                milestones.add(followersMilestone);
+            }
+            
+            return ResponseEntity.ok(milestones);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching milestones: " + e.getMessage());
+        }
+    }
 }
