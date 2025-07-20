@@ -49,12 +49,12 @@ public class SecurityConfig {
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
 //                .defaultSuccessUrl("https://arceon.netlify.app/dashboard", true)
-                // .defaultSuccessUrl("https://arceon.netlify.app/dashboard", true)
-                .defaultSuccessUrl("http://localhost:3000/dashboard", true)
+             .defaultSuccessUrl("https://arceon.netlify.app/dashboard", true)
+                //.defaultSuccessUrl("http://localhost:3000/dashboard", true)
             )
             .logout(logout -> logout
-                // .logoutSuccessUrl("https://arceon.netlify.app/login").permitAll()
-                .logoutSuccessUrl("http://localhost:3000/login").permitAll()
+                 .logoutSuccessUrl("https://arceon.netlify.app/login").permitAll()
+                //.logoutSuccessUrl("http://localhost:3000/login").permitAll()
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

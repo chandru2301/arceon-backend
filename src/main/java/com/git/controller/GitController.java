@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import com.git.security.JwtTokenUtil;
 
@@ -47,8 +48,8 @@ public class GitController {
     private String githubClientId;
     @Value("${github.client.secret:c99ea03480d72296a406273e2f4653c6d6db72d7}")
     private String githubClientSecret;
-    // @Value("${github.redirect.uri:https://arceon.netlify.app/oauth/callback}")
-    @Value("${github.redirect.uri:http://localhost:3000/oauth/callback}")
+     @Value("${github.redirect.uri:https://arceon.netlify.app/oauth/callback}")
+    //@Value("${github.redirect.uri:http://localhost:3000/oauth/callback}")
     private String githubRedirectUri;   
 
     private static final Logger logger = LoggerFactory.getLogger(GitController.class);
@@ -196,6 +197,34 @@ public class GitController {
                 Map.class
             );
             logger.info("GitHub Profile Response: {}", response.getBody());
+            return ResponseEntity.ok(response.getBody());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching GitHub profile: " + e.getMessage());
+        }
+    }
+
+    // Get specific user's GitHub profile
+    @GetMapping("/github/profile/{username}")
+    public ResponseEntity<?> getGitHubProfileByUsername(HttpServletRequest request, @PathVariable String username) {
+        String accessToken = getGitHubTokenFromJWT(request);
+        if (accessToken == null) {
+            return ResponseEntity.status(401).body("GitHub access token not found");
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.set("Accept", "application/vnd.github+json");
+            headers.set("User-Agent", "GitHub-Flow-App");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                githubApiBaseUrl + "/users/" + username,
+                HttpMethod.GET,
+                entity,
+                Map.class
+            );
+            logger.info("GitHub Profile Response for {}: {}", username, response.getBody());
             return ResponseEntity.ok(response.getBody());
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error fetching GitHub profile: " + e.getMessage());
@@ -604,6 +633,45 @@ public ResponseEntity<?> getTotalStars(HttpServletRequest request) {
     }
 }
 
+@GetMapping("/github/stars/{username}")
+public ResponseEntity<?> getTotalStarsByUsername(HttpServletRequest request, @PathVariable String username) {
+    String accessToken = getGitHubTokenFromJWT(request);
+    if (accessToken == null) {
+        return ResponseEntity.status(401).body("GitHub access token not found");
+    }
+
+    try {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        headers.set("Accept", "application/vnd.github+json");
+        headers.set("User-Agent", "GitHub-Flow-App");
+
+        int totalStars = 0;
+        int page = 1;
+
+        while (true) {
+            String url = "https://api.github.com/users/" + username + "/repos?per_page=100&page=" + page;
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<List> response = restTemplate.exchange(url, HttpMethod.GET, entity, List.class);
+            List<Map<String, Object>> repos = response.getBody();
+
+            if (repos == null || repos.isEmpty()) break;
+
+            for (Map<String, Object> repo : repos) {
+                Integer stars = (Integer) repo.get("stargazers_count");
+                if (stars != null) totalStars += stars;
+            }
+
+            if (repos.size() < 100) break; // Last page
+            page++;
+        }
+        logger.info("GitHub Total Stars Response for {}: {}", username, totalStars);
+        return ResponseEntity.ok(Map.of("totalStars", totalStars));
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body("Error fetching stars: " + e.getMessage());
+    }
+}
+
 @PostMapping("/github/pinned")
 public ResponseEntity<?> getPinnedRepos(HttpServletRequest request) {
     String accessToken = getGitHubTokenFromJWT(request);
@@ -636,6 +704,40 @@ public ResponseEntity<?> getPinnedRepos(HttpServletRequest request) {
             String.class
         );
         logger.info("GitHub Pinned Repositories Response: {}", response.getBody());     
+        return ResponseEntity.ok(response.getBody());
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body("Error fetching pinned repos: " + e.getMessage());
+    }
+}
+
+@PostMapping("/github/pinned/{username}")
+public ResponseEntity<?> getPinnedReposByUsername(HttpServletRequest request, @PathVariable String username) {
+    String accessToken = getGitHubTokenFromJWT(request);
+    if (accessToken == null) {
+        return ResponseEntity.status(401).body("GitHub access token not found");
+    }
+
+    try {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("User-Agent", "GitHub-Flow-App");
+
+        String graphqlQuery = """
+        {
+          "query": "query { user(login: \\"%s\\") { pinnedItems(first: 6, types: [REPOSITORY]) { totalCount nodes { ... on Repository { name description stargazerCount url languages(first: 3) { nodes { name color } } } } } } }"
+        }
+        """.formatted(username);
+
+        HttpEntity<String> entity = new HttpEntity<>(graphqlQuery, headers);
+
+        ResponseEntity<String> response = restTemplate.exchange(
+            "https://api.github.com/graphql",
+            HttpMethod.POST,
+            entity,
+            String.class
+        );
+        logger.info("GitHub Pinned Repositories Response for {}: {}", username, response.getBody());     
         return ResponseEntity.ok(response.getBody());
     } catch (Exception e) {
         return ResponseEntity.status(500).body("Error fetching pinned repos: " + e.getMessage());
@@ -1176,6 +1278,93 @@ public ResponseEntity<String> healthCheck() {
             // Sort by value (descending)
             chartData.sort((a, b) -> Integer.compare((Integer) b.get("value"), (Integer) a.get("value")));
             
+            return ResponseEntity.ok(chartData);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching language statistics: " + e.getMessage());
+        }
+    }
+
+    // Get specific user's language statistics
+    @GetMapping("/github/languages/{username}")
+    public ResponseEntity<?> getUserLanguagesByUsername(HttpServletRequest request, @PathVariable String username) {
+        String accessToken = getGitHubTokenFromJWT(request);
+        if (accessToken == null) {
+            return ResponseEntity.status(401).body("GitHub access token not found");
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.set("Accept", "application/vnd.github+json");
+            headers.set("User-Agent", "GitHub-Flow-App");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            // Get user repositories
+            ResponseEntity<List> reposResponse = restTemplate.exchange(
+                githubApiBaseUrl + "/users/" + username + "/repos?per_page=100",
+                HttpMethod.GET,
+                entity,
+                List.class
+            );
+            
+            List<Map<String, Object>> repos = reposResponse.getBody();
+            Map<String, Integer> languageStats = new HashMap<>();
+            int totalBytes = 0;
+            
+            if (repos != null) {
+                // Collect language statistics from all repositories
+                for (Map<String, Object> repo : repos) {
+                    String repoName = (String) repo.get("name");
+                    String fullName = (String) repo.get("full_name");
+                    
+                    // Get languages for this repository
+                    ResponseEntity<Map> langResponse = restTemplate.exchange(
+                        githubApiBaseUrl + "/repos/" + fullName + "/languages",
+                        HttpMethod.GET,
+                        entity,
+                        Map.class
+                    );
+                    
+                    Map<String, Object> languages = langResponse.getBody();
+                    if (languages != null) {
+                        for (Map.Entry<String, Object> entry : languages.entrySet()) {
+                            String language = entry.getKey();
+                            Integer bytes = (Integer) entry.getValue();
+                            
+                            languageStats.put(language, languageStats.getOrDefault(language, 0) + bytes);
+                            totalBytes += bytes;
+                        }
+                    }
+                }
+            }
+            
+            // Convert to chart data format
+            List<Map<String, Object>> chartData = new ArrayList<>();
+            String[] colors = {
+                "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
+                "#06B6D4", "#F97316", "#EC4899", "#84CC16", "#6366F1"
+            };
+            
+            int colorIndex = 0;
+            for (Map.Entry<String, Integer> entry : languageStats.entrySet()) {
+                Map<String, Object> languageData = new HashMap<>();
+                languageData.put("name", entry.getKey());
+                languageData.put("value", entry.getValue());
+                
+                // Calculate percentage
+                double percentage = totalBytes > 0 ? (entry.getValue() * 100.0) / totalBytes : 0;
+                languageData.put("percentage", Math.round(percentage * 100.0) / 100.0);
+                languageData.put("color", colors[colorIndex % colors.length]);
+                
+                chartData.add(languageData);
+                colorIndex++;
+            }
+            
+            // Sort by value (descending)
+            chartData.sort((a, b) -> Integer.compare((Integer) b.get("value"), (Integer) a.get("value")));
+            
+            logger.info("GitHub Languages Response for {}: {} languages", username, chartData.size());
             return ResponseEntity.ok(chartData);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error fetching language statistics: " + e.getMessage());
