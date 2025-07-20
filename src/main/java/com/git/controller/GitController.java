@@ -1002,74 +1002,74 @@ public ResponseEntity<String> healthCheck() {
 //                    Integer contributions = (Integer) repo.get("contributions");
 //                    if (contributions != null) totalContributions += contributions;
 //                }
-             // GraphQL Query to get total contributions
-                Map<String, Object> queryMap = new HashMap<>();
-                queryMap.put("query", String.format("""
-                    query {
-                        user(login: "%s") {
-                            contributionsCollection {
-                                contributionCalendar {
-                                    totalContributions
-                                    weeks {
-                                        contributionDays {
-                                            contributionCount
-                                            date
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                """, username));
+              // GraphQL Query to get total contributions
+                 Map<String, Object> queryMap = new HashMap<>();
+                 queryMap.put("query", String.format("""
+                     query {
+                         user(login: "%s") {
+                             contributionsCollection {
+                                 contributionCalendar {
+                                     totalContributions
+                                     weeks {
+                                         contributionDays {
+                                             contributionCount
+                                             date
+                                         }
+                                     }
+                                 }
+                             }
+                         }
+                     }
+                 """, username));
 
-                HttpEntity<Map<String, Object>> graphqlRequest = new HttpEntity<>(queryMap, headers);
+                 HttpEntity<Map<String, Object>> graphqlRequest = new HttpEntity<>(queryMap, headers);
 
-                ResponseEntity<Map> contributionsResponse = restTemplate.exchange(
-                    githubApiBaseUrl + "/graphql",
-                    HttpMethod.POST,
-                    graphqlRequest,
-                    Map.class
-                );
+                 ResponseEntity<Map> contributionsResponse = restTemplate.exchange(
+                     githubApiBaseUrl + "/graphql",
+                     HttpMethod.POST,
+                     graphqlRequest,
+                     Map.class
+                 );
 
-                Map<String, Object> contributions = contributionsResponse.getBody();
-                Map<String, Object> data = (Map<String, Object>) contributions.get("data");
-                Map<String, Object> user = (Map<String, Object>) data.get("user");
-                Map<String, Object> collection = (Map<String, Object>) user.get("contributionsCollection");
-                Map<String, Object> calendar = (Map<String, Object>) collection.get("contributionCalendar");
+                 Map<String, Object> contributions = contributionsResponse.getBody();
+                 Map<String, Object> data = (Map<String, Object>) contributions.get("data");
+                 Map<String, Object> user = (Map<String, Object>) data.get("user");
+                 Map<String, Object> collection = (Map<String, Object>) user.get("contributionsCollection");
+                 Map<String, Object> calendar = (Map<String, Object>) collection.get("contributionCalendar");
 
-                // ✅ Get total contributions from GraphQL
-                Integer totalContributions = (Integer) calendar.get("totalContributions");
-                System.out.println("totalContributions: " + totalContributions);
+                 // ✅ Get total contributions from GraphQL
+                 Integer totalContributions = (Integer) calendar.get("totalContributions");
+                 System.out.println("totalContributions: " + totalContributions);
 
-                // 📌 Add milestone for contributions
-                Map<String, Object> contributionsMilestone = new HashMap<>();
-                contributionsMilestone.put("label", "Total Contributions");
-                contributionsMilestone.put("current", totalContributions != null ? totalContributions : 0);
-                contributionsMilestone.put("target", 1500);
-                contributionsMilestone.put("unit", "contributions");
+                 // 📌 Add milestone for contributions
+                 Map<String, Object> contributionsMilestone = new HashMap<>();
+                 contributionsMilestone.put("label", "Total Contributions");
+                 contributionsMilestone.put("current", totalContributions != null ? totalContributions : 0);
+                 contributionsMilestone.put("target", 1500);
+                 contributionsMilestone.put("unit", "contributions");
 
-                // Optional: Add progress
-                if (totalContributions != null) {
-                    double progress = Math.min(100.0, (totalContributions * 100.0) / 1500.0);
-                    contributionsMilestone.put("progress", progress);
-                }
+                 // Optional: Add progress
+                 if (totalContributions != null) {
+                     double progress = Math.min(100.0, (totalContributions * 100.0) / 1500.0);
+                     contributionsMilestone.put("progress", progress);
+                 }
 
-                milestones.add(contributionsMilestone);
+                 milestones.add(contributionsMilestone);
 
-                // 📌 Repositories milestone
-                Map<String, Object> reposMilestone = new HashMap<>();
-                reposMilestone.put("label", "Repositories");
-                reposMilestone.put("current", publicRepos != null ? publicRepos : 0);
-                reposMilestone.put("target", 100);
-                reposMilestone.put("unit", "repos");
+                 // 📌 Repositories milestone
+                 Map<String, Object> reposMilestone = new HashMap<>();
+                 reposMilestone.put("label", "Repositories");
+                 reposMilestone.put("current", publicRepos != null ? publicRepos : 0);
+                 reposMilestone.put("target", 100);
+                 reposMilestone.put("unit", "repos");
 
-                if (publicRepos != null) {
-                    double repoProgress = Math.min(100.0, (publicRepos * 100.0) / 100.0);
-                    reposMilestone.put("progress", repoProgress);
-                }
+                 if (publicRepos != null) {
+                     double repoProgress = Math.min(100.0, (publicRepos * 100.0) / 100.0);
+                     reposMilestone.put("progress", repoProgress);
+                 }
 
-                milestones.add(reposMilestone);
-    
+                 milestones.add(reposMilestone);
+                
                 // Stars milestone
                 Map<String, Object> starsMilestone = new HashMap<>();
                 starsMilestone.put("label", "Stars Received");
@@ -1090,6 +1090,95 @@ public ResponseEntity<String> healthCheck() {
             return ResponseEntity.ok(milestones);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error fetching milestones: " + e.getMessage());
+        }
+    }
+
+    // Get user language statistics
+    @GetMapping("/github/languages")
+    public ResponseEntity<?> getUserLanguages(HttpServletRequest request) {
+        String accessToken = getGitHubTokenFromJWT(request);
+        if (accessToken == null) {
+            return ResponseEntity.status(401).body("GitHub access token not found");
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.set("Accept", "application/vnd.github+json");
+            headers.set("User-Agent", "GitHub-Flow-App");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            String jwtToken = request.getHeader("Authorization").substring(7);
+            String username = jwtTokenUtil.extractUsername(jwtToken);
+            
+            // Get user repositories
+            ResponseEntity<List> reposResponse = restTemplate.exchange(
+                githubApiBaseUrl + "/users/" + username + "/repos?per_page=100",
+                HttpMethod.GET,
+                entity,
+                List.class
+            );
+            
+            List<Map<String, Object>> repos = reposResponse.getBody();
+            Map<String, Integer> languageStats = new HashMap<>();
+            int totalBytes = 0;
+            
+            if (repos != null) {
+                // Collect language statistics from all repositories
+                for (Map<String, Object> repo : repos) {
+                    String repoName = (String) repo.get("name");
+                    String fullName = (String) repo.get("full_name");
+                    
+                    // Get languages for this repository
+                    ResponseEntity<Map> langResponse = restTemplate.exchange(
+                        githubApiBaseUrl + "/repos/" + fullName + "/languages",
+                        HttpMethod.GET,
+                        entity,
+                        Map.class
+                    );
+                    
+                    Map<String, Object> languages = langResponse.getBody();
+                    if (languages != null) {
+                        for (Map.Entry<String, Object> entry : languages.entrySet()) {
+                            String language = entry.getKey();
+                            Integer bytes = (Integer) entry.getValue();
+                            
+                            languageStats.put(language, languageStats.getOrDefault(language, 0) + bytes);
+                            totalBytes += bytes;
+                        }
+                    }
+                }
+            }
+            
+            // Convert to chart data format
+            List<Map<String, Object>> chartData = new ArrayList<>();
+            String[] colors = {
+                "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
+                "#06B6D4", "#F97316", "#EC4899", "#84CC16", "#6366F1"
+            };
+            
+            int colorIndex = 0;
+            for (Map.Entry<String, Integer> entry : languageStats.entrySet()) {
+                Map<String, Object> languageData = new HashMap<>();
+                languageData.put("name", entry.getKey());
+                languageData.put("value", entry.getValue());
+                
+                // Calculate percentage
+                double percentage = totalBytes > 0 ? (entry.getValue() * 100.0) / totalBytes : 0;
+                languageData.put("percentage", Math.round(percentage * 100.0) / 100.0);
+                languageData.put("color", colors[colorIndex % colors.length]);
+                
+                chartData.add(languageData);
+                colorIndex++;
+            }
+            
+            // Sort by value (descending)
+            chartData.sort((a, b) -> Integer.compare((Integer) b.get("value"), (Integer) a.get("value")));
+            
+            return ResponseEntity.ok(chartData);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching language statistics: " + e.getMessage());
         }
     }
 }
